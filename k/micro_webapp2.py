@@ -7,7 +7,10 @@ import datetime
 import time
 
 from google.appengine.ext import ndb
+from webapp2_extras import auth
+from webapp2_extras import sessions
 
+#flask風のマイクロフレームワーク
 class WSGIApplication(webapp2.WSGIApplication):
     def __init__(self, *args, **kwargs):
         super(WSGIApplication, self).__init__(*args, **kwargs)
@@ -41,3 +44,27 @@ class WSGIApplication(webapp2.WSGIApplication):
             return func
 
         return wrapper
+        
+
+
+class SessionHandler(webapp2.RequestHandler):
+    def dispatch(self):
+        self.session_store = sessions.get_store(request=self.request)
+        try:
+            webapp2.RequestHandler.dispatch(self)
+        finally:
+            self.session_store.save_sessions(self.response)
+
+    @webapp2.cached_property
+    def session(self):
+        return self.session_store.get_session()
+        
+        
+def checkauth(handler):
+    def check(self, *args, **kwargs):
+        auth = self.auth
+        if not auth.get_user_by_session():
+            self.redirect("/login", abort=True)
+        else:
+            return handler(self, *args, **kwargs)
+    return check

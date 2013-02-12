@@ -3,7 +3,7 @@
 
 import sys
 
-#“ú–{Œêˆ—‚¨‚Ü‚¶‚È‚¢-------------
+#æ—¥æœ¬èªå‡¦ç†ãŠã¾ã˜ãªã„-------------
 stdin = sys.stdin
 stdout = sys.stdout
 reload(sys)
@@ -17,37 +17,59 @@ from google.appengine.api import users
 from google.appengine.api import memcache
 
 import webapp2
-import k.micro_webapp2
+from webapp2_extras import auth
+from webapp2_extras import sessions
 
+import k.micro_webapp2
 from k.models import *
 
-app =  k.micro_webapp2.WSGIApplication(debug=True)
+app =  k.micro_webapp2.WSGIApplication(debug=True,
+	config={'webapp2_extras.sessions':{
+            'secret_key':'test_sskey',
+            'cookie_name':'KUMA---',
+            'session_max_age':3600,
+            'cookie_arg':{
+                'max_age':None,
+                'domain':None,
+                'path':'/',
+                'secure':None,
+                'httponly':None,
+            },
+            'default_backend':'memcache'
+            }}
+)
 
 @app.route('/login')
 def loginHandler(r):
-	#Gmail‚ÌƒAƒJƒEƒ“ƒgæ“¾
+	#Gmailã®ã‚¢ã‚«ã‚¦ãƒ³ãƒˆå–å¾—
 	user = users.get_current_user()
 
-	#ƒƒOƒCƒ“‚µ‚Ä‚È‚¢
+	#ãƒ­ã‚°ã‚¤ãƒ³ã—ã¦ãªã„
 	if not user:
 		login_url=users.create_login_url('/login')
-		return "<A HREF='"+login_url+"'>Google‚ÅƒƒOƒCƒ“</A>"
+		return "<A HREF='"+login_url+"'>Sign in with Google</A>"
 	
-	#‚µ‚Ä‚é
+	#ã—ã¦ã‚‹
 	new_userid = "GMAIL#"+str( user.user_id() )
-	if AccountDB.get(new_userid):
-	p = AccountDB()
-	p.populate(
-	 userid = "GMAIL#"+str( user.user_id() )
-	)
-	p.put()
-	return p
+	try:
+		AccountDB.get_by_id(new_userid).key.delete()# ãƒ†ã‚¹ãƒˆ
+		PlayerDB.get_by_id(new_userid).key.delete()# ãƒ†ã‚¹ãƒˆ
+	except:
+		pass
+	if AccountDB.get_by_id(new_userid):#IDã®é‡è¤‡ãƒã‚§ãƒƒã‚¯
+		return "duplicate"
+	a = AccountDB(id = new_userid, userid = new_userid, create_by = "GMAIL")
+	p = PlayerDB(id = new_userid, namae=user.nickname())  #TODO åå‰å…¥åŠ›
+	ndb.put_multi( (a, p) )#ç”Ÿæˆ
+	return a
 
 @app.route('/adduser')
 def adduserHandler(r):
 	return 
 
-@app.route('/')
-def rootHandler(r):
-	
-	return "hello"
+@k.micro_webapp2.checkauth
+class rootHandler(k.micro_webapp2.SessionHandler):
+	@app.route('/')
+	def get(self):
+		return PlayerDB.get_by_id("GMAIL#185804764220139124118")
+
